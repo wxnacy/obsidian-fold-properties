@@ -36,13 +36,28 @@ export class FolderFoldSettingTab extends PluginSettingTab {
 
 		this.plugin.settings.foldersToCollapse.forEach((path, index) => {
 			let draftValue = path;
-			const setting = new Setting(containerEl).addText((text) => {
+			const setting = new Setting(containerEl);
+			setting.controlEl.style.display = 'flex';
+			setting.controlEl.style.alignItems = 'center';
+			setting.controlEl.style.gap = '8px';
+
+			setting.addText((text) => {
 				text
 					.setPlaceholder('例如：Folder/Subfolder')
 					.setValue(path)
 					.onChange((value) => {
 						draftValue = value;
+						this.updateFolderDatalist(setting, text.inputEl, value, index);
 					});
+
+				text.inputEl.addClass('folders-to-collapse-input');
+				text.inputEl.style.flex = '1 1 auto';
+				text.inputEl.style.width = '100%';
+				text.inputEl.style.minWidth = '0';
+
+				text.inputEl.addEventListener('focus', () => {
+					this.updateFolderDatalist(setting, text.inputEl, text.inputEl.value, index);
+				});
 
 				text.inputEl.addEventListener('blur', async () => {
 					const normalized = draftValue.trim();
@@ -70,6 +85,8 @@ export class FolderFoldSettingTab extends PluginSettingTab {
 					await this.plugin.saveSettings();
 					this.plugin.foldConfiguredFolders();
 				});
+
+				this.updateFolderDatalist(setting, text.inputEl, path, index);
 			});
 
 			setting.addExtraButton((button) => {
@@ -84,5 +101,56 @@ export class FolderFoldSettingTab extends PluginSettingTab {
 					});
 			});
 		});
+	}
+
+	private folderCache: string[] | null = null;
+
+	private updateFolderDatalist(setting: Setting, inputEl: HTMLInputElement, query: string, index: number) {
+		const datalistId = `folders-to-collapse-${index}`;
+		let datalist = setting.controlEl.querySelector(`datalist[data-folder-index="${index}"]`) as HTMLDataListElement | null;
+		if (!datalist) {
+			datalist = document.createElement('datalist');
+			datalist.id = datalistId;
+			datalist.dataset.folderIndex = String(index);
+			setting.controlEl.appendChild(datalist);
+			inputEl.setAttribute('list', datalistId);
+		}
+
+		const folders = this.getAllFolders();
+		const normalized = query.trim().toLowerCase();
+		const suggestions = normalized
+			? folders.filter((folderPath) => folderPath.toLowerCase().includes(normalized))
+			: folders;
+		const limited = suggestions.slice(0, 50);
+
+		datalist.innerHTML = '';
+		for (const folderPath of limited) {
+			const option = document.createElement('option');
+			option.value = folderPath;
+			datalist.appendChild(option);
+		}
+	}
+
+	private getAllFolders(): string[] {
+		if (this.folderCache) {
+			return this.folderCache;
+		}
+
+		const folders: string[] = [];
+		const root = this.app.vault.getRoot();
+		const walk = (folder: TFolder) => {
+			if (folder.path) {
+				folders.push(folder.path);
+			}
+			for (const child of folder.children) {
+				if (child instanceof TFolder) {
+					walk(child);
+				}
+			}
+		};
+
+		walk(root);
+		this.folderCache = folders;
+		return folders;
 	}
 }
