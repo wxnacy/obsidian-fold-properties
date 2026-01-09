@@ -22,8 +22,8 @@ export class FolderFoldSettingTab extends PluginSettingTab {
 		containerEl.empty();
 
 		new Setting(containerEl)
-			.setName('需要折叠的文件夹')
-			.setDesc('添加需要在文件资源管理器中自动折叠的文件夹。')
+			.setName('需要折叠属性的文件夹')
+			.setDesc('打开这些文件夹中的 Markdown 文件时，自动折叠文件属性。')
 			.addButton((button) => {
 				button.setButtonText('增加')
 					.setCta()
@@ -83,7 +83,6 @@ export class FolderFoldSettingTab extends PluginSettingTab {
 					draftValue = resolvedPath;
 					text.setValue(resolvedPath);
 					await this.plugin.saveSettings();
-					this.plugin.foldConfiguredFolders();
 				});
 
 				this.updateFolderDatalist(setting, text.inputEl, path, index);
@@ -97,7 +96,6 @@ export class FolderFoldSettingTab extends PluginSettingTab {
 						this.plugin.settings.foldersToCollapse.splice(index, 1);
 						await this.plugin.saveSettings();
 						this.display();
-						this.plugin.foldConfiguredFolders();
 					});
 			});
 		});
