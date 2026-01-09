@@ -3,7 +3,7 @@
 ## Project overview
 
 - 目标：Obsidian 插件可以实现文件夹折叠(TypeScript → bundled JavaScript).
-- 项目灵感来源：https://github.com/tbergeron/obsidian-fold-properties-by-default，但是这个项目没有实现文件夹折叠的功能，所以这个项目是基于这个项目开发的。
+- 项目灵感来源：https://github.com/tbergeron/obsidian-fold-properties-by-default（如果地址访问不同，也可以查看 obsidian-fold-properties-by-default.ts），但是这个项目没有实现文件夹折叠的功能，所以这个项目是基于这个项目开发的。
 
 ## 项目结构:
   - `src/main.ts`：主文件
