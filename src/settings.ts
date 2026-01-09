@@ -1,7 +1,8 @@
-import {App, Notice, PluginSettingTab, Setting, TFolder} from "obsidian";
+import {App, Notice, PluginSettingTab, Setting, TFolder, AbstractInputSuggest} from "obsidian";
 import MyPlugin from "./main";
 
 export interface MyPluginSettings {
+	/** 需要折叠属性的文件夹路径列表 */
 	foldersToCollapse: string[];
 }
 
@@ -9,6 +10,10 @@ export const DEFAULT_SETTINGS: MyPluginSettings = {
 	foldersToCollapse: []
 }
 
+/**
+ * 插件设置标签页类
+ * 负责渲染和管理插件的用户界面设置
+ */
 export class FolderFoldSettingTab extends PluginSettingTab {
 	plugin: MyPlugin;
 
@@ -17,6 +22,10 @@ export class FolderFoldSettingTab extends PluginSettingTab {
 		this.plugin = plugin;
 	}
 
+	/**
+	 * 渲染设置界面
+	 * 创建文件夹列表管理界面，包括添加、删除、编辑功能
+	 */
 	display(): void {
 		const {containerEl} = this;
 		containerEl.empty();
@@ -47,7 +56,6 @@ export class FolderFoldSettingTab extends PluginSettingTab {
 					.setValue(path)
 					.onChange((value) => {
 						draftValue = value;
-						this.updateFolderDatalist(setting, text.inputEl, value, index);
 					});
 
 				text.inputEl.addClass('folders-to-collapse-input');
@@ -55,10 +63,10 @@ export class FolderFoldSettingTab extends PluginSettingTab {
 				text.inputEl.style.width = '100%';
 				text.inputEl.style.minWidth = '0';
 
-				text.inputEl.addEventListener('focus', () => {
-					this.updateFolderDatalist(setting, text.inputEl, text.inputEl.value, index);
-				});
+				/** 使用 Obsidian 内置的自动补全功能 */
+				new FolderSuggest(this.app, text.inputEl);
 
+				/** 失去焦点时验证并保存文件夹路径 */
 				text.inputEl.addEventListener('blur', async () => {
 					const normalized = draftValue.trim();
 					if (!normalized) {
@@ -84,10 +92,9 @@ export class FolderFoldSettingTab extends PluginSettingTab {
 					text.setValue(resolvedPath);
 					await this.plugin.saveSettings();
 				});
-
-				this.updateFolderDatalist(setting, text.inputEl, path, index);
 			});
 
+			/** 添加删除按钮 */
 			setting.addExtraButton((button) => {
 				button
 					.setIcon('trash')
@@ -100,55 +107,56 @@ export class FolderFoldSettingTab extends PluginSettingTab {
 			});
 		});
 	}
+}
 
-	private folderCache: string[] | null = null;
+/**
+ * 文件夹自动补全建议类
+ * 使用 Obsidian 的 AbstractInputSuggest 类实现
+ * 提供高性能的文件夹搜索和补全功能
+ */
+class FolderSuggest extends AbstractInputSuggest<string> {
+	/** 缓存所有文件夹路径 */
+	folders: string[];
 
-	private updateFolderDatalist(setting: Setting, inputEl: HTMLInputElement, query: string, index: number) {
-		const datalistId = `folders-to-collapse-${index}`;
-		let datalist = setting.controlEl.querySelector(`datalist[data-folder-index="${index}"]`) as HTMLDataListElement | null;
-		if (!datalist) {
-			datalist = document.createElement('datalist');
-			datalist.id = datalistId;
-			datalist.dataset.folderIndex = String(index);
-			setting.controlEl.appendChild(datalist);
-			inputEl.setAttribute('list', datalistId);
-		}
-
-		const folders = this.getAllFolders();
-		const normalized = query.trim().toLowerCase();
-		const suggestions = normalized
-			? folders.filter((folderPath) => folderPath.toLowerCase().includes(normalized))
-			: folders;
-		const limited = suggestions.slice(0, 50);
-
-		datalist.innerHTML = '';
-		for (const folderPath of limited) {
-			const option = document.createElement('option');
-			option.value = folderPath;
-			datalist.appendChild(option);
-		}
+	/**
+	 * 构造函数
+	 * @param app - Obsidian 应用实例
+	 * @param inputEl - 输入框元素
+	 */
+	constructor(app: App, inputEl: HTMLInputElement) {
+		super(app, inputEl);
+		this.folders = app.vault.getAllFolders().map(folder => folder.path);
 	}
 
-	private getAllFolders(): string[] {
-		if (this.folderCache) {
-			return this.folderCache;
-		}
+	/**
+	 * 根据输入内容获取匹配的文件夹建议
+	 * @param inputStr - 用户输入的搜索字符串
+	 * @returns 匹配的文件夹路径数组
+	 */
+	getSuggestions(inputStr: string): string[] {
+		const inputLower = inputStr.toLowerCase();
+		return this.folders.filter(folder =>
+			folder.toLowerCase().includes(inputLower)
+		);
+	}
 
-		const folders: string[] = [];
-		const root = this.app.vault.getRoot();
-		const walk = (folder: TFolder) => {
-			if (folder.path) {
-				folders.push(folder.path);
-			}
-			for (const child of folder.children) {
-				if (child instanceof TFolder) {
-					walk(child);
-				}
-			}
-		};
+	/**
+	 * 渲染单个建议项
+	 * @param folder - 文件夹路径
+	 * @param el - 建议项的 DOM 元素
+	 */
+	renderSuggestion(folder: string, el: HTMLElement): void {
+		el.createEl("div", { text: folder });
+	}
 
-		walk(root);
-		this.folderCache = folders;
-		return folders;
+	/**
+	 * 选择建议项时的处理
+	 * 将选中的文件夹路径填入输入框并关闭建议列表
+	 * @param folder - 选中的文件夹路径
+	 * @param evt - 鼠标或键盘事件
+	 */
+	selectSuggestion(folder: string, evt: MouseEvent | KeyboardEvent): void {
+		this.setValue(folder);
+		this.close();
 	}
 }
